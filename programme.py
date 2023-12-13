@@ -11,7 +11,6 @@ def run_program(path, dir_name):
     start_time = time.time()
 
     files_path = path + "\\"
-    # "C:\\Users\\mbong\\OneDrive\\Bureau\\python_photo_sort\\"
     files_list = os.listdir(files_path)
     NUMBER_OF_TREADS = math.floor(os.cpu_count() / 1.14)  # optimal threads number (theory)
     metadata = []
