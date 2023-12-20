@@ -10,9 +10,10 @@ import time
 def run_program(path, date_format):
     start_time = time.time()
 
+    NUMBER_OF_TREADS = math.floor(os.cpu_count() / 1.14)  # optimal threads number (theory)
+
     files_path = path + "\\"
     files_list = os.listdir(files_path)
-    NUMBER_OF_TREADS = math.floor(os.cpu_count() / 1.14)  # optimal threads number (theory)
     files_meta = {}
 
 
@@ -58,17 +59,7 @@ def run_program(path, date_format):
             i += 1
         return chunck_list
 
-
-    # Create files path
-    files_path_list = filter_list(files_list, 'file')
-    for i, file in enumerate(files_path_list):
-        files_path_list[i] = files_path + file
-
-    # Prepare multi threading
-    if NUMBER_OF_TREADS < len(files_path_list):
-        splited_files_list = split_list(files_path_list, NUMBER_OF_TREADS)
-
-
+    ''' Use exifTool to extract photos metadata (even raw photos) '''
     def get_metadata(file_list):
         print("Analysing")
         with ExifToolHelper() as et:
@@ -114,12 +105,21 @@ def run_program(path, date_format):
         for thread in threads:
             thread.join()
 
+
+    # Create files path list
+    files_path_list = filter_list(files_list, 'file')
+    for i, file in enumerate(files_path_list):
+        files_path_list[i] = files_path + file
+
+    # Prepare multi threading
+    if NUMBER_OF_TREADS < len(files_path_list):
+        splited_files_list = split_list(files_path_list, NUMBER_OF_TREADS)
+
     # Get metadata
     if NUMBER_OF_TREADS < len(files_path_list):
         use_threads(get_metadata, splited_files_list)
     else:
         get_metadata(files_path_list)
-
 
     for date in files_meta:
         # Format date name
@@ -134,5 +134,3 @@ def run_program(path, date_format):
 
     end_time = time.time()
     print(str(round(end_time - start_time, 2)) + "s")
-
-# repush
