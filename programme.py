@@ -1,6 +1,6 @@
 from exiftool import ExifToolHelper
 import os
-import subprocess
+import shutil
 from datetime import datetime
 import math
 import threading
@@ -98,7 +98,7 @@ def run_program(path, date_format):
             # Move file in dir
             destination_path = files_path + file_date_taken
             source_file_path = os.path.normpath(source_file_path)
-            subprocess.run('move "' + source_file_path + '" "' + destination_path + '"', shell=True)
+            shutil.move(source_file_path, destination_path)
 
 
     ''' Uses threads with wanted functions '''
