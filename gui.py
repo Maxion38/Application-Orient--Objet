@@ -21,7 +21,7 @@ class FolderSelectorApp(App):
         # Select and run
         select_dir = BoxLayout(orientation='horizontal')
         select_dir.add_widget(Button(text="Sélectionner un dossier", on_press=self.show_folder_dialog))
-        select_dir.add_widget(Button(text="Trier le dossier", on_press=lambda instance: run_program(self.selected_folder)))
+        select_dir.add_widget(Button(text="Trier le dossier", on_press=lambda instance: run_program(self.selected_folder, "%y-%m-%d")))
 
         # show selected dir
         self.dir_display = BoxLayout(orientation='horizontal')
