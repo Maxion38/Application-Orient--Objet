@@ -7,13 +7,13 @@ import threading
 import time
 
 
-def run_program(path, dir_name):
+def run_program(path, date_format):
     start_time = time.time()
 
     files_path = path + "\\"
     files_list = os.listdir(files_path)
     NUMBER_OF_TREADS = math.floor(os.cpu_count() / 1.14)  # optimal threads number (theory)
-    metadata = []
+    files_meta = {}
 
 
     ''' Filter files list to 'dir' or 'file' '''
@@ -37,10 +37,6 @@ def run_program(path, dir_name):
 
     ''' Split list into n lists '''
     def split_list(input_list, chunck_number):
-        if chunck_number > len(input_list):
-            print("annomalie: trop de threads")
-
-
         chunck_list = []
         step = math.floor(len(input_list)/chunck_number)
         start = 0
@@ -65,19 +61,28 @@ def run_program(path, dir_name):
 
     # Create files path
     files_path_list = filter_list(files_list, 'file')
-    print(files_list)
     for i, file in enumerate(files_path_list):
         files_path_list[i] = files_path + file
 
     # Prepare multi threading
-    splited_files_list = split_list(files_path_list, NUMBER_OF_TREADS)
+    if NUMBER_OF_TREADS < len(files_path_list):
+        splited_files_list = split_list(files_path_list, NUMBER_OF_TREADS)
 
 
     def get_metadata(file_list):
         print("Analysing")
         with ExifToolHelper() as et:
             metadata_elem = et.get_tags(file_list, tags=["DateTimeOriginal"])
-            metadata.append(metadata_elem)
+
+            for file in metadata_elem:
+                day = datetime.strptime(file["EXIF:DateTimeOriginal"], "%Y:%m:%d %H:%M:%S")
+                day = day.strftime("%y-%m-%d")
+
+                if day not in files_meta:
+                    files_meta[day] = []
+
+                files_meta[day].append(file)
+
         print("OK")
 
 
@@ -88,7 +93,7 @@ def run_program(path, dir_name):
             file_date_taken = file["EXIF:DateTimeOriginal"]
             # Format date name
             file_date_taken = datetime.strptime(file_date_taken, "%Y:%m:%d %H:%M:%S")
-            file_date_taken = file_date_taken.strftime(dir_name)
+            file_date_taken = file_date_taken.strftime(date_format)
 
             # Move file in dir
             destination_path = files_path + file_date_taken
@@ -109,34 +114,23 @@ def run_program(path, dir_name):
         for thread in threads:
             thread.join()
 
-
     # Get metadata
-    use_threads(get_metadata, splited_files_list)
-    all_files_metadata = []
-    for metadata_list in metadata:
-        for file in metadata_list:
-            all_files_metadata.append(file)
-    print("L'analyse des fichiers est terminée")
+    if NUMBER_OF_TREADS < len(files_path_list):
+        use_threads(get_metadata, splited_files_list)
+    else:
+        get_metadata(files_path_list)
 
 
-    future_dir_set = set()
-    # Create dirs
-    for file in all_files_metadata:
-        file_date_taken = file["EXIF:DateTimeOriginal"]
+    for date in files_meta:
         # Format date name
-        file_date_taken = datetime.strptime(file_date_taken, "%Y:%m:%d %H:%M:%S")
-        file_date_taken = file_date_taken.strftime(dir_name)
-        future_dir_set.add(file_date_taken)
+        formated_date = datetime.strptime(date, "%y-%m-%d")
+        formated_date = formated_date.strftime(date_format)
 
-    dir_list = filter_list(files_list, 'dir')
-    for dir in future_dir_set:
-        if dir not in dir_list:
-            os.mkdir(files_path + dir)
-            print("Dir " + dir + " created")
+        # Create dir
+        os.mkdir(files_path + formated_date)
 
-    # Move photos
-    use_threads(os_files_sort, metadata)
-    print("Finished")
+        # Move photos
+        os_files_sort(files_meta[date])
 
     end_time = time.time()
     print(str(round(end_time - start_time, 2)) + "s")
