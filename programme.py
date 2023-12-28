@@ -1,9 +1,17 @@
+from exiftool import ExifToolHelper
+import os
+import shutil
+from datetime import datetime
+import math
+import threading
+
+
 class OrderFiles:
     """Class that extract metadata and can order files by date
 
     Author : Bongartz Maxime
     Date : December 2023
-    This class analyse metadata and order files using metadata
+    This class allows files manipulations
     """
 
     def __init__(self, dir_path, date_format):
@@ -21,7 +29,45 @@ class OrderFiles:
 
         """
 
-        pass
+        # Paths
+        self.__dir_path = dir_path
+        self.__files_list = os.listdir(self.__dir_path)
+
+        # Others
+        self.__treads_number = math.floor(os.cpu_count() / 1.14)  # optimal threads number (theory)
+        self.files_meta = {}
+        self.__date_format = date_format
+
+        # Do all neceseries to get the dict(), values are day date and keys are files paths
+
+        # Create files path list
+        self.__files_path_list = self.__filter_list(self.__files_list, 'file')
+
+        for i, file in enumerate(self.__files_path_list):
+            self.__files_path_list[i] = self.__dir_path + file
+
+
+        # Prepare multi threading
+        if self.__treads_number < len(self.__files_path_list):
+            self.__splited_files_list = self.__split_list(self.__files_path_list, self.__treads_number)
+
+        # Get metadata
+        if self.__treads_number < len(self.__files_path_list):
+            self.__use_threads(self.__append_files_by_date, self.__splited_files_list)
+        else:
+            self.__append_files_by_date(self.__files_path_list)
+
+        for date in self.files_meta:
+            # Format date name
+            formated_date = datetime.strptime(date, "%y-%m-%d")
+            formated_date = formated_date.strftime(self.__date_format)
+
+            # Create dir
+            os.mkdir(self.__dir_path + formated_date)
+
+            # Move photos
+            self.__os_files_sort(self.files_meta[date])
+
 
 
     def __append_files_by_date(self, file_list):
@@ -31,7 +77,20 @@ class OrderFiles:
         POST : self.__files_meta is a dict() where keys are a date and values are the files with this date name
         """
 
-        pass
+        print("Analysing")
+        with ExifToolHelper() as et:
+            metadata_elem = et.get_tags(file_list, tags=["DateTimeOriginal"])
+
+            for metadata_file in metadata_elem:
+                day = datetime.strptime(metadata_file["EXIF:DateTimeOriginal"], "%Y:%m:%d %H:%M:%S")
+                day = day.strftime("%y-%m-%d")
+
+                if day not in self.files_meta:
+                    self.files_meta[day] = []
+
+                self.files_meta[day].append(metadata_file)
+
+        print("OK")
 
 
     def __use_threads(self, function, arg):
@@ -43,7 +102,16 @@ class OrderFiles:
         POST :  use self.__treads_number number of cpu cores to process wanted function faster
         """
 
-        pass
+        # Open threads
+        threads = []
+        for tn in range(self.__treads_number):
+            thread = threading.Thread(target=function, args=(arg[tn],))
+            threads.append(thread)
+            thread.start()
+
+        # Wait threads
+        for thread in threads:
+            thread.join()
 
 
     def __split_list(self, input_list, chunck_number):
@@ -54,7 +122,26 @@ class OrderFiles:
         POST : returns chunck_list a list of chunck_number lists
         """
 
-        pass
+        chunck_list = []
+        step = math.floor(len(input_list)/chunck_number)
+        start = 0
+        stop = 0
+        for i in range(chunck_number):
+            temp_list = []
+            stop += step
+            for pos in range(start, stop):
+                temp_list.append(input_list[pos])
+
+            chunck_list.append(temp_list)
+            start += step
+
+        # Rest
+        rest = stop
+        i = 0
+        for pos in range(rest, len(input_list)):
+            chunck_list[i].append(input_list[pos])
+            i += 1
+        return chunck_list
 
 
     def __filter_list(self, input_list, by):
@@ -65,7 +152,21 @@ class OrderFiles:
         POST : returns file_list a list of file names filtered by the file or dir depending on the by param
         """
 
-        pass
+        if by == 'dir':
+            dir_list = []
+            for input_file in input_list:
+                if os.path.isdir(self.__dir_path + input_file):
+                    dir_list.append(input_file)
+
+            return dir_list
+
+        if by == 'file':
+            file_list = []
+            for file in input_list:
+                if os.path.isfile(self.__dir_path + file):
+                    file_list.append(file)
+
+            return file_list
 
 
     def __os_files_sort(self, metadata_list):
@@ -76,5 +177,14 @@ class OrderFiles:
         correct dirs
 
         """
+        for fn, meta_file in enumerate(metadata_list):
+            source_file_path = meta_file["SourceFile"]
+            file_date_taken = meta_file["EXIF:DateTimeOriginal"]
+            # Format date name
+            file_date_taken = datetime.strptime(file_date_taken, "%Y:%m:%d %H:%M:%S")
+            file_date_taken = file_date_taken.strftime(self.__date_format)
 
-        pass
+            # Move file in dir
+            destination_path = self.__dir_path + file_date_taken
+            source_file_path = os.path.normpath(source_file_path)
+            shutil.move(source_file_path, destination_path)
