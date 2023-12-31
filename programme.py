@@ -38,10 +38,21 @@ class OrderFiles:
 
 
     def os_order_files(self):
+        """Order all the files in dirs. A dir is named by de day date of a file.
+
+        PRE : self.__build_meta_dict() must build the self.__files_meta dict
+              self.__os_move_files() must move all the files according to the self.__files_meta dict
+        POST : builds self.__files_meta dict
+               make dirs and move photos in
+        """
+
         start_time = time.time()
 
-        # Builds files_meta
-        self.__build_meta_dict()
+        # Create list
+        valid_list = self.__create_valid_list()
+
+        # Builds __files_meta
+        self.__threads_list(self.__fill_meta_dict, valid_list)
 
         for date in self.__files_meta:
             # Format date name
@@ -59,9 +70,13 @@ class OrderFiles:
         print(str(round((end_time - start_time), 2)) + "s")
 
 
-    def __build_meta_dict(self):
-        # Do all neceseries to fill __files_meta, values are day date and keys are files paths
-        # Create files path list
+    def __create_valid_list(self):
+        """ Do all neceseries to fill self.__files_meta, values are day date and keys are files paths.
+
+        PRE : self.__fill_meta_dict must build the self.__files_meta
+              self.__threads_list must thread the function
+        POST : returns final_list a list with full paths of all the files from self.__dir_path
+        """
 
         # Creates files list
         files_list = os.listdir(self.__dir_path)
@@ -72,20 +87,19 @@ class OrderFiles:
             if os.path.isfile(self.__dir_path + file):
                 final_list.append(file)
 
-        # Complete to full path
+        # Files to full path files
         for i, file in enumerate(final_list):
             final_list[i] = self.__dir_path + file
 
-        # Fill meta dict
-        self.__threads_list(self.__fill_meta_dict, final_list)
+        return final_list
 
 
     def __threads_list(self, function, initial_list):
-        """ Uses threads with wanted functions.
+        """ Uses threads with wanted functions and their list.
 
-        PRE :   function must be a valid function
-                arg must be the arg of the function
-                arg should be a list with same length as the self.__treads_number
+        PRE :   function must be a function
+                initial_list must be the argument of the function
+                initial_list must be a list
         POST :  use self.__treads_number number of cpu cores to process wanted function faster
         """
 
@@ -141,10 +155,11 @@ class OrderFiles:
 
 
     def __fill_meta_dict(self, file_list):
-        """ Use exifTool to extract photos metadata (even from raw photos).
+        """ Use exifTool to extract files metadata (even from raw photos) and builds the self.__files_meta.
 
         PRE : file_list must be a list of complete files paths ex: ['C:\\path\\IMG_0172.CR3', 'C:\\path\\IMG_0173.CR3']
-        POST : self.__files_meta is a dict() where keys are a date and values are the files with this date name
+              file_list must refer to files that are compatible with ExifTool
+        POST : self.__files_meta is a dict() where keys are dates and values are the file path
         """
 
         print("Analysing")
