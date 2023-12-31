@@ -4,6 +4,7 @@ import shutil
 from datetime import datetime
 import math
 import threading
+import time
 
 
 class OrderFiles:
@@ -15,58 +16,28 @@ class OrderFiles:
     """
 
     def __init__(self, dir_path, date_format):
-        """Keep the paths needed and get date metadata.
+        """Construct all needs for the program.
 
         PRE : dir_path should be a valid dir path
               date_format must be usable by strftime function
-        POST :  self.__dir_path is the dir selected to be sorted
-                self.__files_list is the list of files names in self.__dir_path
+        POST :  self.__dir_path is the path of the dir
                 self.__treads_number is the optimal number of threads that will be used
-                self.files_meta is an empty dict
                 self.__date_format is the date format
-                self.__files_path_list is the list of files paths + names in self.__dir_path
-                self.__splited_files_list is the __files_path_list splited by the number of threads
-
+                self.__files_meta is an empty dict
         """
 
-        # Paths
+        # Path
         self.__dir_path = dir_path
-        self.__files_list = os.listdir(self.__dir_path)
 
-        # Others
+        # Utils
         self.__treads_number = math.floor(os.cpu_count() / 1.14)  # optimal threads number (theory)
-        self.files_meta = {}
         self.__date_format = date_format
 
-        # Do all neceseries to get the dict(), values are day date and keys are files paths
-
-        # Create files path list
-        self.__files_path_list = []
-        for file in self.__files_list:
-            if os.path.isfile(self.__dir_path + file):
-                self.__files_path_list.append(file)
-
-        for i, file in enumerate(self.__files_path_list):
-            self.__files_path_list[i] = self.__dir_path + file
-
-        # Get metadata
-        self.__use_threads_list(self.__append_files_by_date, self.__files_path_list)
+        # Main dict
+        self.__files_meta = {}
 
 
-        for date in self.files_meta:
-            # Format date name
-            formated_date = datetime.strptime(date, "%y-%m-%d")
-            formated_date = formated_date.strftime(self.__date_format)
-
-            # Create dir
-            os.mkdir(self.__dir_path + formated_date)
-
-            # Move photos
-            self.__os_files_sort(self.files_meta[date])
-
-
-
-    def __append_files_by_date(self, file_list):
+    def __fill_meta_dict(self, file_list):
         """ Use exifTool to extract photos metadata (even from raw photos).
 
         PRE : file_list must be a list of complete files paths ex: ['C:\\path\\IMG_0172.CR3', 'C:\\path\\IMG_0173.CR3']
@@ -81,15 +52,15 @@ class OrderFiles:
                 day = datetime.strptime(metadata_file["EXIF:DateTimeOriginal"], "%Y:%m:%d %H:%M:%S")
                 day = day.strftime("%y-%m-%d")
 
-                if day not in self.files_meta:
-                    self.files_meta[day] = []
+                if day not in self.__files_meta:
+                    self.__files_meta[day] = []
 
-                self.files_meta[day].append(metadata_file)
+                self.__files_meta[day].append(metadata_file)
 
         print("OK")
 
 
-    def __use_threads_list(self, function, initial_list):
+    def __threads_list(self, function, initial_list):
         """ Uses threads with wanted functions.
 
         PRE :   function must be a valid function
@@ -99,7 +70,7 @@ class OrderFiles:
         """
 
         # Split list by number of threads
-        splited_files_list = self.__files_path_list
+        splited_files_list = initial_list
 
         if self.__treads_number < len(initial_list):
             splited_files_list = self.__split_list(initial_list, self.__treads_number)
@@ -149,7 +120,7 @@ class OrderFiles:
         return chunck_list
 
 
-    def __os_files_sort(self, metadata_list):
+    def __os_move_files(self, metadata_list):
         """ Os modifications.
 
         PRE : metadata_list is a dict, keys are strings / values is a list of dicts with filenames
@@ -168,3 +139,43 @@ class OrderFiles:
             destination_path = self.__dir_path + file_date_taken
             source_file_path = os.path.normpath(source_file_path)
             shutil.move(source_file_path, destination_path)
+
+
+    def __build_meta_dict(self):
+        # Do all neceseries to fill __files_meta, values are day date and keys are files paths
+        # Create files path list
+
+        # Creates files list
+        files_list = os.listdir(self.__dir_path)
+
+        # Keep only file
+        final_list = []
+        for file in files_list:
+            if os.path.isfile(self.__dir_path + file):
+                final_list.append(file)
+
+        # Complete to full path
+        for i, file in enumerate(final_list):
+            final_list[i] = self.__dir_path + file
+
+        # Fill meta dict
+        self.__threads_list(self.__fill_meta_dict, final_list)
+
+
+    def os_order_files(self):
+        start_time = time.time()
+        self.__build_meta_dict()
+
+        for date in self.__files_meta:
+            # Format date name
+            formated_date = datetime.strptime(date, "%y-%m-%d")
+            formated_date = formated_date.strftime(self.__date_format)
+
+            # Create dir
+            os.mkdir(self.__dir_path + formated_date)
+
+            # Move photos
+            self.__os_move_files(self.__files_meta[date])
+
+        end_time = time.time()
+        print(str(round((end_time - start_time), 2)) + "s")
