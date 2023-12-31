@@ -37,27 +37,47 @@ class OrderFiles:
         self.__files_meta = {}
 
 
-    def __fill_meta_dict(self, file_list):
-        """ Use exifTool to extract photos metadata (even from raw photos).
+    def os_order_files(self):
+        start_time = time.time()
 
-        PRE : file_list must be a list of complete files paths ex: ['C:\\path\\IMG_0172.CR3', 'C:\\path\\IMG_0173.CR3']
-        POST : self.__files_meta is a dict() where keys are a date and values are the files with this date name
-        """
+        # Builds files_meta
+        self.__build_meta_dict()
 
-        print("Analysing")
-        with ExifToolHelper() as et:
-            metadata_elem = et.get_tags(file_list, tags=["DateTimeOriginal"])
+        for date in self.__files_meta:
+            # Format date name
+            formated_date = datetime.strptime(date, "%y-%m-%d")
+            formated_date = formated_date.strftime(self.__date_format)
 
-            for metadata_file in metadata_elem:
-                day = datetime.strptime(metadata_file["EXIF:DateTimeOriginal"], "%Y:%m:%d %H:%M:%S")
-                day = day.strftime("%y-%m-%d")
+            # Create dir
+            os.mkdir(self.__dir_path + formated_date)
 
-                if day not in self.__files_meta:
-                    self.__files_meta[day] = []
+            # Move photos
+            self.__os_move_files(self.__files_meta[date])
 
-                self.__files_meta[day].append(metadata_file)
+        end_time = time.time()
+        print("Done")
+        print(str(round((end_time - start_time), 2)) + "s")
 
-        print("OK")
+
+    def __build_meta_dict(self):
+        # Do all neceseries to fill __files_meta, values are day date and keys are files paths
+        # Create files path list
+
+        # Creates files list
+        files_list = os.listdir(self.__dir_path)
+
+        # Keep only file
+        final_list = []
+        for file in files_list:
+            if os.path.isfile(self.__dir_path + file):
+                final_list.append(file)
+
+        # Complete to full path
+        for i, file in enumerate(final_list):
+            final_list[i] = self.__dir_path + file
+
+        # Fill meta dict
+        self.__threads_list(self.__fill_meta_dict, final_list)
 
 
     def __threads_list(self, function, initial_list):
@@ -120,6 +140,29 @@ class OrderFiles:
         return chunck_list
 
 
+    def __fill_meta_dict(self, file_list):
+        """ Use exifTool to extract photos metadata (even from raw photos).
+
+        PRE : file_list must be a list of complete files paths ex: ['C:\\path\\IMG_0172.CR3', 'C:\\path\\IMG_0173.CR3']
+        POST : self.__files_meta is a dict() where keys are a date and values are the files with this date name
+        """
+
+        print("Analysing")
+        with ExifToolHelper() as et:
+            metadata_elem = et.get_tags(file_list, tags=["DateTimeOriginal"])
+
+            for metadata_file in metadata_elem:
+                day = datetime.strptime(metadata_file["EXIF:DateTimeOriginal"], "%Y:%m:%d %H:%M:%S")
+                day = day.strftime("%y-%m-%d")
+
+                if day not in self.__files_meta:
+                    self.__files_meta[day] = []
+
+                self.__files_meta[day].append(metadata_file)
+
+        print("OK")
+
+
     def __os_move_files(self, metadata_list):
         """ Os modifications.
 
@@ -139,43 +182,3 @@ class OrderFiles:
             destination_path = self.__dir_path + file_date_taken
             source_file_path = os.path.normpath(source_file_path)
             shutil.move(source_file_path, destination_path)
-
-
-    def __build_meta_dict(self):
-        # Do all neceseries to fill __files_meta, values are day date and keys are files paths
-        # Create files path list
-
-        # Creates files list
-        files_list = os.listdir(self.__dir_path)
-
-        # Keep only file
-        final_list = []
-        for file in files_list:
-            if os.path.isfile(self.__dir_path + file):
-                final_list.append(file)
-
-        # Complete to full path
-        for i, file in enumerate(final_list):
-            final_list[i] = self.__dir_path + file
-
-        # Fill meta dict
-        self.__threads_list(self.__fill_meta_dict, final_list)
-
-
-    def os_order_files(self):
-        start_time = time.time()
-        self.__build_meta_dict()
-
-        for date in self.__files_meta:
-            # Format date name
-            formated_date = datetime.strptime(date, "%y-%m-%d")
-            formated_date = formated_date.strftime(self.__date_format)
-
-            # Create dir
-            os.mkdir(self.__dir_path + formated_date)
-
-            # Move photos
-            self.__os_move_files(self.__files_meta[date])
-
-        end_time = time.time()
-        print(str(round((end_time - start_time), 2)) + "s")
