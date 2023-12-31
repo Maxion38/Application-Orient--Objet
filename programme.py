@@ -41,21 +41,17 @@ class OrderFiles:
         # Do all neceseries to get the dict(), values are day date and keys are files paths
 
         # Create files path list
-        self.__files_path_list = self.__filter_list(self.__files_list, 'file')
+        self.__files_path_list = []
+        for file in self.__files_list:
+            if os.path.isfile(self.__dir_path + file):
+                self.__files_path_list.append(file)
 
         for i, file in enumerate(self.__files_path_list):
             self.__files_path_list[i] = self.__dir_path + file
 
-
-        # Prepare multi threading
-        if self.__treads_number < len(self.__files_path_list):
-            self.__splited_files_list = self.__split_list(self.__files_path_list, self.__treads_number)
-
         # Get metadata
-        if self.__treads_number < len(self.__files_path_list):
-            self.__use_threads(self.__append_files_by_date, self.__splited_files_list)
-        else:
-            self.__append_files_by_date(self.__files_path_list)
+        self.__use_threads_list(self.__append_files_by_date, self.__files_path_list)
+
 
         for date in self.files_meta:
             # Format date name
@@ -93,7 +89,7 @@ class OrderFiles:
         print("OK")
 
 
-    def __use_threads(self, function, arg):
+    def __use_threads_list(self, function, initial_list):
         """ Uses threads with wanted functions.
 
         PRE :   function must be a valid function
@@ -102,16 +98,25 @@ class OrderFiles:
         POST :  use self.__treads_number number of cpu cores to process wanted function faster
         """
 
-        # Open threads
-        threads = []
-        for tn in range(self.__treads_number):
-            thread = threading.Thread(target=function, args=(arg[tn],))
-            threads.append(thread)
-            thread.start()
+        # Split list by number of threads
+        splited_files_list = self.__files_path_list
 
-        # Wait threads
-        for thread in threads:
-            thread.join()
+        if self.__treads_number < len(initial_list):
+            splited_files_list = self.__split_list(initial_list, self.__treads_number)
+
+            # Open threads
+            threads = []
+            for tn in range(self.__treads_number):
+                thread = threading.Thread(target=function, args=(splited_files_list[tn],))
+                threads.append(thread)
+                thread.start()
+
+            # Wait threads
+            for thread in threads:
+                thread.join()
+
+        else:
+            function(splited_files_list)
 
 
     def __split_list(self, input_list, chunck_number):
@@ -142,31 +147,6 @@ class OrderFiles:
             chunck_list[i].append(input_list[pos])
             i += 1
         return chunck_list
-
-
-    def __filter_list(self, input_list, by):
-        """ Filter files list to 'dir' or 'file'.
-
-        PRE : input_list must be a list of files names
-              by must only be 'dir' or 'file'
-        POST : returns file_list a list of file names filtered by the file or dir depending on the by param
-        """
-
-        if by == 'dir':
-            dir_list = []
-            for input_file in input_list:
-                if os.path.isdir(self.__dir_path + input_file):
-                    dir_list.append(input_file)
-
-            return dir_list
-
-        if by == 'file':
-            file_list = []
-            for file in input_list:
-                if os.path.isfile(self.__dir_path + file):
-                    file_list.append(file)
-
-            return file_list
 
 
     def __os_files_sort(self, metadata_list):
