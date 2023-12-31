@@ -63,7 +63,7 @@ class OrderFiles:
             os.mkdir(self.__dir_path + formated_date)
 
             # Move photos
-            self.__os_move_files(self.__files_meta[date])
+            self.__os_move_files(self.__files_meta[date], formated_date)
 
         end_time = time.time()
         print("Done")
@@ -173,27 +173,21 @@ class OrderFiles:
                 if day not in self.__files_meta:
                     self.__files_meta[day] = []
 
-                self.__files_meta[day].append(metadata_file)
+                self.__files_meta[day].append(metadata_file["SourceFile"])
 
         print("OK")
 
 
-    def __os_move_files(self, metadata_list):
-        """ Os modifications.
+    def __os_move_files(self, metadata_list, date):
+        """ Os modifications: move files in correct dirs.
 
-        PRE : metadata_list is a dict, keys are strings / values is a list of dicts with filenames
-        POST : order the dir chosen at the beginning by creating dirs, their names are dates, then move the files in
-        correct dirs
-
+        PRE : metadata_list is a dict where keys are strings and values is a list of files paths
+        POST : files are moved in corrects dirs
         """
+
         for fn, meta_file in enumerate(metadata_list):
-            source_file_path = meta_file["SourceFile"]
-            file_date_taken = meta_file["EXIF:DateTimeOriginal"]
-            # Format date name
-            file_date_taken = datetime.strptime(file_date_taken, "%Y:%m:%d %H:%M:%S")
-            file_date_taken = file_date_taken.strftime(self.__date_format)
 
             # Move file in dir
-            destination_path = self.__dir_path + file_date_taken
-            source_file_path = os.path.normpath(source_file_path)
+            destination_path = self.__dir_path + date
+            source_file_path = os.path.normpath(meta_file)
             shutil.move(source_file_path, destination_path)
