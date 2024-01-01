@@ -37,6 +37,7 @@ class OrderFiles:
         self.__files_meta = {}
 
 
+
     def os_order_files(self):
         """Order all the files in dirs. A dir is named by de day date of a file.
 
@@ -158,13 +159,21 @@ class OrderFiles:
         """ Use exifTool to extract files metadata (even from raw photos) and builds the self.__files_meta.
 
         PRE : file_list must be a list of complete files paths ex: ['C:\\path\\IMG_0172.CR3', 'C:\\path\\IMG_0173.CR3']
-              file_list must refer to files that are compatible with ExifTool
         POST : self.__files_meta is a dict() where keys are dates and values are the file path
         """
 
         print("Analysing")
         with ExifToolHelper() as et:
-            metadata_elem = et.get_tags(file_list, tags=["DateTimeOriginal"])
+
+            metadata_elem = []
+            for file_path in file_list:
+                try:
+                    metadata = et.get_tags(file_path, tags=["DateTimeOriginal"])
+                    metadata_elem.extend(metadata)
+
+                except Exception as e:
+                    print(f"Erreur lors de la lecture des métadonnées de {file_path}: {e}")
+
 
             for metadata_file in metadata_elem:
                 day = datetime.strptime(metadata_file["EXIF:DateTimeOriginal"], "%Y:%m:%d %H:%M:%S")
@@ -174,7 +183,6 @@ class OrderFiles:
                     self.__files_meta[day] = []
 
                 self.__files_meta[day].append(metadata_file["SourceFile"])
-
         print("OK")
 
 
