@@ -68,7 +68,7 @@ class OrderFiles:
 
         end_time = time.time()
         print("Done")
-        print(str(round((end_time - start_time), 2)) + "s")
+        print(f"{round((end_time - start_time), 2)}s")
 
 
     def __create_valid_list(self):
@@ -88,7 +88,7 @@ class OrderFiles:
             if os.path.isfile(self.__dir_path + file):
                 final_list.append(file)
 
-        # Files to full path files
+        # Full path files
         for i, file in enumerate(final_list):
             final_list[i] = self.__dir_path + file
 
@@ -156,12 +156,14 @@ class OrderFiles:
 
 
     def __fill_meta_dict(self, file_list):
-        """ Use exifTool to extract files metadata (even from raw photos) and builds the self.__files_meta.
+        """ Use exifTool to extract files metadata (even from raw photos) and builds the self.__files_meta. If exiftool
+        is unable to extract metadata, the basic file creation date is used.
 
         PRE : file_list must be a list of complete files paths ex: ['C:\\path\\IMG_0172.CR3', 'C:\\path\\IMG_0173.CR3']
         POST : self.__files_meta is a dict() where keys are dates and values are the file path
         """
 
+        # Analyse potential metadata
         print("Analysing")
         with ExifToolHelper() as et:
 
@@ -184,6 +186,20 @@ class OrderFiles:
 
                 self.__files_meta[day].append(metadata_file["SourceFile"])
         print("OK")
+
+        # Use none metadata creation date
+        for file_path in file_list:
+            result = os.path.getctime(file_path)
+            result = datetime.fromtimestamp(result)
+            day = result.strftime("%y-%m-%d")
+
+            if day not in self.__files_meta:
+                self.__files_meta[day] = []
+
+            self.__files_meta[day].append(file_path)
+
+
+        print(self.__files_meta)
 
 
     def __os_move_files(self, metadata_list, date):
