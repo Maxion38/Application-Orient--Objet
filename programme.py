@@ -7,6 +7,18 @@ import threading
 import time
 
 
+class NotStrException(Exception):
+    pass
+
+
+class IncompleteDateFormatException(Exception):
+    pass
+
+
+class NoFileToProcessException(Exception):
+    pass
+
+
 class OrderFiles:
     """Class that extract metadata and can order files by date
 
@@ -18,16 +30,38 @@ class OrderFiles:
     def __init__(self, dir_path, date_format):
         """Construct all needs for the program.
 
-        PRE : dir_path should be a valid dir path
-              date_format must be usable by strftime function
+        PRE : be carefull not to select files from system, applications, games etc.
         POST :  self.__dir_path is the path of the dir
                 self.__treads_number is the optimal number of threads that will be used
                 self.__date_format is the date format
                 self.__files_meta is an empty dict
+        RAISES : NotStrException if date format is not a string
+                 IncompleteDateFormatException if the date format doesn't include day, month and year
+                 NoFileToProcessException if the program is unable to find files to process
         """
 
+        if not(isinstance(date_format, str)):
+            raise NotStrException("Date format must be a string")
+
+        if not("%d" in date_format):
+            raise IncompleteDateFormatException("No day in date format")
+
+        if not("%m" in date_format or "%b" in date_format):
+            raise IncompleteDateFormatException("No month in date format")
+
+        if not("%y" in date_format or "%Y" in date_format):
+            raise IncompleteDateFormatException("No year in date format")
+
         # Path
-        self.__dir_path = dir_path
+        self.__dir_path = os.path.normpath(dir_path)
+
+        dir_files = []
+        for file in os.listdir(self.__dir_path):
+            if os.path.isfile(os.path.join(self.__dir_path, file)):
+                dir_files.append(file)
+
+        if len(dir_files) < 1:
+            raise NoFileToProcessException("Nothing was detected to be processed in the selected dir")
 
         # Utils
         self.__treads_number = math.floor(os.cpu_count() / 1.14)  # optimal threads number (theory)
@@ -35,7 +69,6 @@ class OrderFiles:
 
         # Main dict
         self.__files_meta = {}
-
 
 
     def os_order_files(self):
@@ -61,7 +94,8 @@ class OrderFiles:
             formated_date = formated_date.strftime(self.__date_format)
 
             # Create dir
-            os.mkdir(self.__dir_path + formated_date)
+            if formated_date not in os.listdir(self.__dir_path):
+                os.mkdir(os.path.join(self.__dir_path, formated_date))
 
             # Move photos
             self.__os_move_files(self.__files_meta[date], formated_date)
@@ -85,12 +119,12 @@ class OrderFiles:
         # Keep only file
         final_list = []
         for file in files_list:
-            if os.path.isfile(self.__dir_path + file):
+            if os.path.isfile(os.path.join(self.__dir_path, file)):
                 final_list.append(file)
 
         # Full path files
         for i, file in enumerate(final_list):
-            final_list[i] = self.__dir_path + file
+            final_list[i] = os.path.join(self.__dir_path, file)
 
         return final_list
 
@@ -199,9 +233,6 @@ class OrderFiles:
             self.__files_meta[day].append(file_path)
 
 
-        print(self.__files_meta)
-
-
     def __os_move_files(self, metadata_list, date):
         """ Os modifications: move files in correct dirs.
 
@@ -212,6 +243,6 @@ class OrderFiles:
         for fn, meta_file in enumerate(metadata_list):
 
             # Move file in dir
-            destination_path = self.__dir_path + date
+            destination_path = os.path.join(self.__dir_path, date)
             source_file_path = os.path.normpath(meta_file)
             shutil.move(source_file_path, destination_path)
