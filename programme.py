@@ -6,6 +6,8 @@ import math
 import threading
 import time
 
+from exiftool.exceptions import ExifToolExecuteError
+
 
 class NotStrException(Exception):
     pass
@@ -16,6 +18,10 @@ class IncompleteDateFormatException(Exception):
 
 
 class NoFileToProcessException(Exception):
+    pass
+
+
+class GreaterDivisorException(Exception):
     pass
 
 
@@ -35,21 +41,21 @@ class OrderFiles:
                 self.__treads_number is the optimal number of threads that will be used
                 self.__date_format is the date format
                 self.__files_meta is an empty dict
-        RAISES : NotStrException if date format is not a string
+        RAISES : TypeError if date format is not a string
                  IncompleteDateFormatException if the date format doesn't include day, month and year
                  NoFileToProcessException if the program is unable to find files to process
         """
 
-        if not(isinstance(date_format, str)):
-            raise NotStrException("Date format must be a string")
+        if not (isinstance(date_format, str)):
+            raise TypeError("Date format must be a string")
 
-        if not("%d" in date_format):
+        if not ("%d" in date_format):
             raise IncompleteDateFormatException("No day in date format")
 
-        if not("%m" in date_format or "%b" in date_format):
+        if not ("%m" in date_format or "%b" in date_format):
             raise IncompleteDateFormatException("No month in date format")
 
-        if not("%y" in date_format or "%Y" in date_format):
+        if not ("%y" in date_format or "%Y" in date_format):
             raise IncompleteDateFormatException("No year in date format")
 
         # Path
@@ -69,7 +75,6 @@ class OrderFiles:
 
         # Main dict
         self.__files_meta = {}
-
 
     def os_order_files(self):
         """Order all the files in dirs. A dir is named by de day date of a file.
@@ -104,12 +109,11 @@ class OrderFiles:
         print("Done")
         print(f"{round((end_time - start_time), 2)}s")
 
-
     def __create_valid_list(self):
         """ Do all neceseries to fill self.__files_meta, values are day date and keys are files paths.
 
         PRE : self.__fill_meta_dict must build the self.__files_meta
-              self.__threads_list must thread the function
+              self.__threads_list must execute the function
         POST : returns final_list a list with full paths of all the files from self.__dir_path
         """
 
@@ -128,15 +132,20 @@ class OrderFiles:
 
         return final_list
 
-
     def __threads_list(self, function, initial_list):
-        """ Uses threads with wanted functions and their list.
+        """ Uses threads with wanted function and his list.
 
-        PRE :   function must be a function
-                initial_list must be the argument of the function
-                initial_list must be a list
-        POST :  use self.__treads_number number of cpu cores to process wanted function faster
+        PRE : no specific precondition
+        POST : execute first argument function with second argument as argument, using threads
+        RAISES : TypeError if function argument is not callable
+                 TypeError if initial_list is not a list
         """
+
+        if not callable(function):
+            raise TypeError("First argument must be callable")
+
+        if not isinstance(initial_list, list):
+            raise TypeError("Second argument must be a list")
 
         # Split list by number of threads
         splited_files_list = initial_list
@@ -158,17 +167,26 @@ class OrderFiles:
         else:
             function(splited_files_list)
 
-
     def __split_list(self, input_list, chunck_number):
         """ Split list into n lists.
 
-        PRE : input_list must be a list
-              input_list must be > chunck_number
+        PRE : no specific precondition
         POST : returns chunck_list a list of chunck_number lists
+        RAISES : TypeError if input_list is not a list or if chunck_number is not int or float
+                 GreaterDivisorException if input_list < chunck_number
         """
 
+        if not isinstance(input_list, list):
+            raise TypeError("First argument must be a list")
+
+        if not isinstance(chunck_number, (float, int)):
+            raise TypeError("Second argument must be a number")
+
+        if len(input_list) < chunck_number:
+            raise GreaterDivisorException("List can only be splited by a more litle number than his lenght")
+
         chunck_list = []
-        step = math.floor(len(input_list)/chunck_number)
+        step = math.floor(len(input_list) / chunck_number)
         start = 0
         stop = 0
         for i in range(chunck_number):
@@ -188,28 +206,39 @@ class OrderFiles:
             i += 1
         return chunck_list
 
-
     def __fill_meta_dict(self, file_list):
         """ Use exifTool to extract files metadata (even from raw photos) and builds the self.__files_meta. If exiftool
-        is unable to extract metadata, the basic file creation date is used.
+        is unable to extract metadata, the basic os file creation date is used.
 
-        PRE : file_list must be a list of complete files paths ex: ['C:\\path\\IMG_0172.CR3', 'C:\\path\\IMG_0173.CR3']
+        PRE : no specific precondition
         POST : self.__files_meta is a dict() where keys are dates and values are the file path
+        RAISES : FileNotFoundError if a path is not a file
         """
 
-        # Analyse potential metadata
+        # Analyse potential metadatas
         print("Analysing")
         with ExifToolHelper() as et:
 
             metadata_elem = []
             for file_path in file_list:
+                if not os.path.isfile(file_path):
+                    raise FileNotFoundError("File list must contains valids files paths")
+
                 try:
                     metadata = et.get_tags(file_path, tags=["DateTimeOriginal"])
                     metadata_elem.extend(metadata)
 
-                except Exception as e:
-                    print(f"Erreur lors de la lecture des métadonnées de {file_path}: {e}")
+                except ExifToolExecuteError:
 
+                    # Analyse os file creation date
+                    result = os.path.getctime(file_path)
+                    result = datetime.fromtimestamp(result)
+                    day = result.strftime("%y-%m-%d")
+
+                    if day not in self.__files_meta:
+                        self.__files_meta[day] = []
+
+                    self.__files_meta[day].append(file_path)
 
             for metadata_file in metadata_elem:
                 day = datetime.strptime(metadata_file["EXIF:DateTimeOriginal"], "%Y:%m:%d %H:%M:%S")
@@ -221,28 +250,26 @@ class OrderFiles:
                 self.__files_meta[day].append(metadata_file["SourceFile"])
         print("OK")
 
-        # Use none metadata creation date
-        for file_path in file_list:
-            result = os.path.getctime(file_path)
-            result = datetime.fromtimestamp(result)
-            day = result.strftime("%y-%m-%d")
+    def __os_move_files(self, input_list, date):
+        """ Os modifications: move files of <input_list> in <date> named dirs.
 
-            if day not in self.__files_meta:
-                self.__files_meta[day] = []
-
-            self.__files_meta[day].append(file_path)
-
-
-    def __os_move_files(self, metadata_list, date):
-        """ Os modifications: move files in correct dirs.
-
-        PRE : metadata_list is a dict where keys are strings and values is a list of files paths
+        PRE : no specific precondition
         POST : files are moved in corrects dirs
+        RAISES : TypeError if input_list is not a list or if date is not a string
+                 FileNotFoundError if elements of input_list are not files
         """
 
-        for fn, meta_file in enumerate(metadata_list):
+        if not isinstance(input_list, list):
+            raise TypeError("First argument is not a list")
+
+        if not isinstance(date, str):
+            raise TypeError("Second argument is not a string")
+
+        for file in input_list:
+            if not os.path.isfile(file):
+                raise FileNotFoundError(f"File not found: {file}")
 
             # Move file in dir
             destination_path = os.path.join(self.__dir_path, date)
-            source_file_path = os.path.normpath(meta_file)
+            source_file_path = os.path.normpath(file)
             shutil.move(source_file_path, destination_path)
