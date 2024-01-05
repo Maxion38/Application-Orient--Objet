@@ -1,5 +1,5 @@
 import argparse
-from programme import run_program
+from timedir import OrderFiles
 
 parser = argparse.ArgumentParser(description="A file organisation scrpit")
 parser.add_argument("path", help="Path of the dir to sort", type=str)
@@ -52,28 +52,4 @@ def format_dir_name(settings):
 
 
 dir_format_str = format_dir_name(args)
-run_program(args.path, dir_format_str)
-
-
-'''
-    un paramètre pour choisir le séparateur (- .  _ etc)
-        ex: -s -separator -> -
-        raise error pour tous les caracteres illégaux (ex: .) 
-
-    un paramètre pour choisir le format américain (MM-JJ-AA) ou internationnal (AA-MM-JJ)
-        ex: -f -format -> america / internationnal 
-
-    un paramètre pour choisir l'ordre des JJ MM AA
-        ex: -o -order -> jma / amj / mja 
-
-    un patamètre pour choisir si l'année est aa ou aaaa
-        ex: -y -year -> yyyy / yy 
-        
-    Un paramètre pour choisir si le mois est mm ou par ex April (voir pour ajouter une lanngue ?)
-        ex: -M -MONTH -> mm / April
-
-    [avancé] un paramètre pour choisir comment trier les dossier. Par exemple, trier par jour, trier par mois, ou par 
-    année
-        ex: -s -sort -> day / month / year / day-month / month-year / day-month-year 
-
-'''
+OrderFiles(args.path, dir_format_str).os_order_files()

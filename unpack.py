@@ -8,18 +8,21 @@ start_time = time.time()
 files_path = "C:\\Users\\mbong\\OneDrive\\Bureau\\python_photo_sort\\"
 
 dir_list = os.listdir(files_path)
-for dir in dir_list:
-    file_path_list = os.listdir(files_path + dir)
 
-    for file in file_path_list:
-        current_file_path = files_path + dir + "\\" + file
-        destination_path = files_path + file
-        shutil.move(current_file_path, destination_path)
-    print(dir + " unpacked")
+for directory in dir_list:
+    if os.path.isdir(files_path + directory):
+        file_path_list = os.listdir(files_path + directory)
+
+        for file in file_path_list:
+            current_file_path = files_path + directory + "\\" + file
+            destination_path = files_path + file
+            shutil.move(current_file_path, destination_path)
+        print(directory + " unpacked")
 print("Directories emptied")
 
 for file_dir in dir_list:
-    if os.path.isdir(files_path + "\\" + file_dir):
+    dir_path = files_path + file_dir
+    if os.path.isdir(dir_path):
         os.rmdir(files_path + file_dir)
 
 print("Directories removed")

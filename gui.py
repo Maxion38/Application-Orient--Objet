@@ -6,7 +6,7 @@ from kivy.uix.button import Button
 import tkinter as tk
 from tkinter import filedialog
 import os
-from programme import run_program
+from timedir import OrderFiles
 
 
 class FolderSelectorApp(App):
@@ -21,14 +21,14 @@ class FolderSelectorApp(App):
         # Select and run
         select_dir = BoxLayout(orientation='horizontal')
         select_dir.add_widget(Button(text="Sélectionner un dossier", on_press=self.show_folder_dialog))
-        select_dir.add_widget(Button(text="Trier le dossier", on_press=lambda instance: run_program(self.selected_folder, "%y-%m-%d")))
+        select_dir.add_widget(Button(text="Trier le dossier", on_press=lambda instance: OrderFiles(self.selected_folder, "%y-%m-%d").os_order_files()))
 
-        # show selected dir
+        # Show selected dir
         self.dir_display = BoxLayout(orientation='horizontal')
         self.dir_label = Label(text=self.selected_folder)
         self.dir_display.add_widget(self.dir_label)
 
-        # Box principal
+        # Main box
         box = BoxLayout(orientation='vertical')
         box.add_widget(select_dir)
         box.add_widget(self.dir_display)
