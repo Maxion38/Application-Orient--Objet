@@ -17,10 +17,6 @@ class IncompleteDateFormatException(Exception):
     pass
 
 
-class NoFileToProcessException(Exception):
-    pass
-
-
 class GreaterDivisorException(Exception):
     pass
 
@@ -34,32 +30,34 @@ class OrderFiles:
     """
 
     def __init__(self, dir_path, date_format):
-        """Construct all needs for the program.
+        """Construct all needs for the program. Be carefull not to select files from system, applications, games etc.
 
-        PRE : be carefull not to select files from system, applications, games etc.
-        POST :  self.__dir_path is the path of the dir
-                self.__treads_number is the optimal number of threads that will be used
-                self.__date_format is the date format
-                self.__files_meta is an empty dict
+        PRE : > date_format is the format of the date used to create dir names. It should be a string with %d
+              representing the day, %m (or %b) representing the month and %y (or %Y) representing the year.
+              > dir_path is the path of the dir that you want to order.
+        POST :  the goal of this class is to order the dir (dir_path) that you selected. According to the date photos
+                where taken or date files were created, it will create dirs with the date as the name (formated by
+                date_format) and move photos in
         RAISES : TypeError if date format is not a string
                  IncompleteDateFormatException if the date format doesn't include day, month and year
-                 NoFileToProcessException if the program is unable to find files to process
+                 FileNotFoundError if the program is unable to find files to process
         """
 
-        if not (isinstance(date_format, str)):
+        if not(isinstance(date_format, str)):
             raise TypeError("Date format must be a string")
 
-        if not ("%d" in date_format):
+        if not("%d" in date_format):
             raise IncompleteDateFormatException("No day in date format")
 
-        if not ("%m" in date_format or "%b" in date_format):
+        if not("%m" in date_format or "%b" in date_format):
             raise IncompleteDateFormatException("No month in date format")
 
-        if not ("%y" in date_format or "%Y" in date_format):
+        if not("%y" in date_format or "%Y" in date_format):
             raise IncompleteDateFormatException("No year in date format")
 
         # Path
         self.__dir_path = os.path.normpath(dir_path)
+        print(self.__dir_path)
 
         dir_files = []
         for file in os.listdir(self.__dir_path):
@@ -67,7 +65,7 @@ class OrderFiles:
                 dir_files.append(file)
 
         if len(dir_files) < 1:
-            raise NoFileToProcessException("Nothing was detected to be processed in the selected dir")
+            raise FileNotFoundError("Nothing was detected to be processed in the selected dir")
 
         # Utils
         self.__treads_number = math.floor(os.cpu_count() / 1.14)  # optimal threads number (theory)
@@ -76,13 +74,14 @@ class OrderFiles:
         # Main dict
         self.__files_meta = {}
 
-    def os_order_files(self):
-        """Order all the files in dirs. A dir is named by de day date of a file.
 
-        PRE : self.__build_meta_dict() must build the self.__files_meta dict
-              self.__os_move_files() must move all the files according to the self.__files_meta dict
-        POST : builds self.__files_meta dict
-               make dirs and move photos in
+    def os_order_files(self):
+        """Makes modifications in the selected dir. Order all the files.
+
+        PRE : the class must have got the dir path (dir that you want to order) and the date format (the way name of the
+              finals dirs will be formated)
+        POST : Order all the files in dirs according to the date. A dir is named by de day date of a file.
+
         """
 
         start_time = time.time()
@@ -109,12 +108,12 @@ class OrderFiles:
         print("Done")
         print(f"{round((end_time - start_time), 2)}s")
 
+
     def __create_valid_list(self):
         """ Do all neceseries to fill self.__files_meta, values are day date and keys are files paths.
 
-        PRE : self.__fill_meta_dict must build the self.__files_meta
-              self.__threads_list must execute the function
-        POST : returns final_list a list with full paths of all the files from self.__dir_path
+        PRE : the class must have been correctly called with valid dir_path and valid date_format
+        POST : returns final_list a list with full paths of all the files (excluding dirs) from self.__dir_path
         """
 
         # Creates files list
@@ -132,11 +131,13 @@ class OrderFiles:
 
         return final_list
 
+
     def __threads_list(self, function, initial_list):
         """ Uses threads with wanted function and his list.
 
         PRE : no specific precondition
-        POST : execute first argument function with second argument as argument, using threads
+        POST : the list initial_list is splited by the number of threads and the function is called multiple time by
+        differents threads with a splited part of the list. So the list is equaly processed with all the threads.
         RAISES : TypeError if function argument is not callable
                  TypeError if initial_list is not a list
         """
@@ -167,11 +168,13 @@ class OrderFiles:
         else:
             function(splited_files_list)
 
+
     def __split_list(self, input_list, chunck_number):
         """ Split list into n lists.
 
         PRE : no specific precondition
-        POST : returns chunck_list a list of chunck_number lists
+        POST : The input list (input_list) is equaly splited by a number of times (chunck_number). Returns chunck_list
+        witch is a list of all the parts of the splited input list.
         RAISES : TypeError if input_list is not a list or if chunck_number is not int or float
                  GreaterDivisorException if input_list < chunck_number
         """
@@ -186,7 +189,7 @@ class OrderFiles:
             raise GreaterDivisorException("List can only be splited by a more litle number than his lenght")
 
         chunck_list = []
-        step = math.floor(len(input_list) / chunck_number)
+        step = math.floor(len(input_list)/chunck_number)
         start = 0
         stop = 0
         for i in range(chunck_number):
@@ -206,12 +209,14 @@ class OrderFiles:
             i += 1
         return chunck_list
 
+
     def __fill_meta_dict(self, file_list):
         """ Use exifTool to extract files metadata (even from raw photos) and builds the self.__files_meta. If exiftool
         is unable to extract metadata, the basic os file creation date is used.
 
-        PRE : no specific precondition
-        POST : self.__files_meta is a dict() where keys are dates and values are the file path
+        PRE : file_list should be a list of files paths
+        POST : use all the files in file_list and analyse them to find date of the file (photo taken or os date) to
+        fill a dict (self.__files_meta) where keys are dates and values are a list of the files paths that have the date
         RAISES : FileNotFoundError if a path is not a file
         """
 
@@ -250,11 +255,12 @@ class OrderFiles:
                 self.__files_meta[day].append(metadata_file["SourceFile"])
         print("OK")
 
+
     def __os_move_files(self, input_list, date):
         """ Os modifications: move files of <input_list> in <date> named dirs.
 
         PRE : no specific precondition
-        POST : files are moved in corrects dirs
+        POST : move all the files of the list input_list in the dir named by date argument
         RAISES : TypeError if input_list is not a list or if date is not a string
                  FileNotFoundError if elements of input_list are not files
         """
